@@ -1,0 +1,434 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description" : "Trifork AWS Infrastructure Test ",
+
+    "Parameters":{
+        "VpcName":{
+
+                "Description": "The VPC Name",
+                "Type": "String",
+                "Default": "Trifork Production VPC"
+            },
+        "CidrRange":{
+            "Description": "The VPC CIDR Range",
+            "Type": "String",
+            "Default": "10.0.0.0",
+            "AllowedValues": [
+                "11.0.0.0",
+                "10.0.0.0"
+            ]           
+        },
+        "AmiId":{
+            "Description": "Webserver Image ID",
+            "Type": "String",
+            "Default": "ami-0f4fe71190a398ba5"         
+        },
+        "InstanceTypeASG":{
+            "Description": "The EC2 instance type for autoscalling group",
+            "Type": "String",
+            "Default": "t2.micro",
+            "AllowedValues": [
+                "t2.micro",
+                "t2.small",
+                "t2.medium",
+                "t2.large"
+
+            ]
+        },
+        "AutoScalingKey":{
+            "Description": "Enter Your Key Pair",
+            "Type": "String",
+            "Default": "trifork" 
+        },
+        "HostedZoneNameAlb":{
+            "Description": "Enter Your Hosted Zone Name Ending with Full stop (.)",
+            "Type": "String",
+            "Default": "sherdilitacademy.net." 
+        },        
+        "HostedName":{
+            "Description": "Enter Your Website Name Ending with Full stop (.)",
+            "Type": "String",
+            "Default": "bilal.sherdilitacademy.net." 
+        }
+        
+        
+        
+    },
+
+    "Mappings": {
+        "SubCidrRange": {
+            "10.0.0.0": {
+                "PublicSubnetAZ1": "10.0.0.0/24",
+                "PrivateSubnetAZ1": "10.0.1.0/24",
+                "PublicSubnetAZ2": "10.0.2.0/24",
+                "PrivateSubnetAZ2": "10.0.3.0/24"
+            },
+            "11.0.0.0": {
+                "PublicSubnetAZ1": "11.0.0.0/24",
+                "PrivateSubnetAZ1": "11.0.1.0/24",
+                "PublicSubnetAZ2": "11.0.2.0/24",
+                "PrivateSubnetAZ2": "11.0.3.0/24"
+            }
+        }
+    },
+
+    "Resources":{
+
+        "VPCA":{
+            "Type" : "AWS::EC2::VPC",
+            "Properties" : {
+                "CidrBlock" :{
+                    "Fn::Join": [
+                    "",
+                    [
+                        {
+                            "Ref": "CidrRange"
+                        },
+                        "/16"
+                    ]
+                ]
+            },
+                "EnableDnsHostnames" : "true",
+                "EnableDnsSupport" : "true",
+                "InstanceTenancy" : "default",
+                "Tags" : [ {"Key":"Name","Value" : {"Ref": "VpcName"}} ]
+            }
+        },
+
+        "PublicSubnetAZ1":{
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "VpcId" : { "Ref" : "VPCA" },
+                "CidrBlock" : {
+                "Fn::FindInMap": [
+                    "SubCidrRange",
+                    {
+                        "Ref": "CidrRange"
+                    },
+                    "PublicSubnetAZ1"
+                ]
+            },
+            "AvailabilityZone" : {
+                "Fn::Select": [
+                    "0",
+                    {
+                        "Fn::GetAZs": {
+                            "Ref": "AWS::Region"
+                        }
+                    }
+                ]
+            },
+            "Tags" : [ { "Key" : "Name", "Value" : "Public Subnet 1" } ]
+            }
+        },
+
+        "PublicSubnetAZ2":{
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "VpcId" : { "Ref" : "VPCA" },
+                "CidrBlock" : {
+                "Fn::FindInMap": [
+                    "SubCidrRange",
+                    {
+                        "Ref": "CidrRange"
+                    },
+                    "PublicSubnetAZ2"
+                ]
+            },
+            "AvailabilityZone" : {
+                "Fn::Select": [
+                    "1",
+                    {
+                        "Fn::GetAZs": {
+                            "Ref": "AWS::Region"
+                        }
+                    }
+                ]
+            },
+            "Tags" : [ { "Key" : "Name", "Value" : "Public Subnet 2" } ]
+            }
+        },
+
+        "PrivateSubnetAZ1":{
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "VpcId" : { "Ref" : "VPCA" },
+                "CidrBlock" : {
+                "Fn::FindInMap": [
+                    "SubCidrRange",
+                    {
+                        "Ref": "CidrRange"
+                    },
+                    "PrivateSubnetAZ1"
+                ]
+            },
+            "AvailabilityZone" : {
+                "Fn::Select": [
+                    "0",
+                    {
+                        "Fn::GetAZs": {
+                            "Ref": "AWS::Region"
+                        }
+                    }
+                ]
+            },
+            "Tags" : [ { "Key" : "Name", "Value" : "Private Subnet 1" } ]
+            }
+        },
+        "PrivateSubnetAZ2":{
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "VpcId" : { "Ref" : "VPCA" },
+                "CidrBlock" : {
+                "Fn::FindInMap": [
+                    "SubCidrRange",
+                    {
+                        "Ref": "CidrRange"
+                    },
+                    "PrivateSubnetAZ2"
+                ]
+            },
+            "AvailabilityZone" : {
+                "Fn::Select": [
+                    "1",
+                    {
+                        "Fn::GetAZs": {
+                            "Ref": "AWS::Region"
+                        }
+                    }
+                ]
+            },
+            "Tags" : [ { "Key" : "Name", "Value" : "Private Subnet 2" } ]
+            }
+        },
+
+        "PublicRouteTable":{
+
+            "Type" : "AWS::EC2::RouteTable",
+            "Properties" : {
+               "VpcId" : { "Ref" : "VPCA" },
+               "Tags" : [ { "Key" : "Name", "Value" : "Public Route Table" } ]
+            }
+        },
+
+        "PrivateRouteTable":{
+
+            "Type" : "AWS::EC2::RouteTable",
+            "Properties" : {
+               "VpcId" : { "Ref" : "VPCA" },
+               "Tags" : [ { "Key" : "Name", "Value" : "Private Route Table" } ]
+            }
+        },
+
+        "PublicRouteTableAssociationAZ1" : {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+            "SubnetId" : { "Ref" : "PublicSubnetAZ1" },
+            "RouteTableId" : { "Ref" : "PublicRouteTable" }
+            }
+        } ,
+
+        "PublicRouteTableAssociationAZ2" : {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+            "SubnetId" : { "Ref" : "PublicSubnetAZ2" },
+            "RouteTableId" : { "Ref" : "PublicRouteTable" }
+            }
+        } ,
+
+        "PrivateRouteTableAssociationAZ1" : {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+            "SubnetId" : { "Ref" : "PrivateSubnetAZ1" },
+            "RouteTableId" : { "Ref" : "PrivateRouteTable" }
+            }
+        },
+
+        "PrivateRouteTableAssociationAZ2" : {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+            "SubnetId" : { "Ref" : "PrivateSubnetAZ2" },
+            "RouteTableId" : { "Ref" : "PrivateRouteTable" }
+            }
+        },
+        "VpcIgw":{
+            "Type" : "AWS::EC2::InternetGateway",
+            "Properties" : {
+              "Tags" : [ {"Key" : "Name", "Value" : "Internet Gateway"}]
+            }
+        },
+        
+
+        "VpcIgwAttachement":{
+            "Type" : "AWS::EC2::VPCGatewayAttachment",
+            "Properties" : {
+                "InternetGatewayId" : {"Ref":"VpcIgw"},
+                "VpcId" : {"Ref":"VPCA"}
+            }
+        },
+
+        "IgwRoute":{
+            "Type" : "AWS::EC2::Route",
+            "Properties" : {
+                "DestinationCidrBlock" : "0.0.0.0/0",
+                "GatewayId" : {"Ref": "VpcIgw"},
+                "RouteTableId" : {"Ref":"PublicRouteTable"}
+        
+              }
+        },
+        "ASGSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+               "GroupDescription" : "Allow http to client host",
+               "VpcId" : {"Ref" : "VPCA"},
+               "SecurityGroupIngress" : [
+                {
+                  "IpProtocol" : "tcp",
+                  "FromPort" : 22,
+                  "ToPort" : 22,
+                  "CidrIp" : "0.0.0.0/0"
+                },
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : 80,
+                    "ToPort" : 80,
+                    "CidrIp" : "0.0.0.0/0"
+                  }
+            ],
+               "SecurityGroupEgress" : [
+                {
+                  "IpProtocol" : "tcp",
+                  "FromPort" : 80,
+                  "ToPort" : 80,
+                  "CidrIp" : "0.0.0.0/0"
+                },
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : 22,
+                    "ToPort" : 22,
+                    "CidrIp" : "0.0.0.0/0"
+                }
+            ]
+            }
+        },
+        "LoadBalancerSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+               "GroupDescription" : "Allow http to client host",
+               "VpcId" : {"Ref" : "VPCA"},
+               "SecurityGroupIngress" : [
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : 80,
+                    "ToPort" : 80,
+                    "CidrIp" : "0.0.0.0/0"
+                  }
+            ],
+               "SecurityGroupEgress" : [
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : 80,
+                    "ToPort" : 80,
+                    "CidrIp" : "0.0.0.0/0"
+                }
+            ]
+            }
+        },
+        "ASGLaunchConfig":{
+            "Type":"AWS::AutoScaling::LaunchConfiguration",
+            "Properties":{
+              "ImageId":{ "Ref":"AmiId" },
+              "SecurityGroups":[ { "Ref":"ASGSecurityGroup" } ],
+              "InstanceType":{ "Ref":"InstanceTypeASG" },
+              "KeyName":{
+                "Ref":"AutoScalingKey"
+              }
+    
+            }
+        },
+        "AutoscalingGroupDefine":{
+            "Type" : "AWS::AutoScaling::AutoScalingGroup",
+            "Properties" : {
+                "DesiredCapacity" : "1",
+                "LaunchConfigurationName" : {"Ref":"ASGLaunchConfig"},
+                "MaxSize" : "3",
+                "MinSize" : "1",
+                "Tags" : [ {"Key":"Name","Value":"Auto Scaling Group","PropagateAtLaunch" : "true"}],
+                "TargetGroupARNs" : [ {"Ref":"AlbTargetGroup"}],
+                "VPCZoneIdentifier" : [ {"Ref":"PrivateSubnetAZ1"},{"Ref":"PrivateSubnetAZ2"}]
+                
+            }
+        },
+
+        "AsgLoadBalancer":  {
+            "Type" : "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties" : {
+                "IpAddressType" : "ipv4",
+                "SecurityGroups" : [ {"Ref":"LoadBalancerSecurityGroup"}],
+                "Subnets" : [ {"Ref":"PublicSubnetAZ1"},{"Ref":"PublicSubnetAZ2"}],
+                "Tags" : [ {"Key":"Name","Value":"Trifork Loadbalancer"} ],
+                "Type" : "application"
+            }
+        },
+        "AlbTargetGroup":{
+            "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties" : {
+                "Port" : 80,
+                "Protocol" : "HTTP",
+                "VpcId" : {"Ref":"VPCA"}
+              }
+        },
+        
+        "AlbListenerRule": {
+            "Type" : "AWS::ElasticLoadBalancingV2::ListenerRule",
+            "Properties" : {
+                "Actions" : [{
+                    "Type": "forward",
+                    "TargetGroupArn": { "Ref": "AlbTargetGroup" }
+                  }],
+                  "Conditions": [{
+                    "Field": "path-pattern",
+                    "Values": ["/"]
+                  }], 
+                "ListenerArn" : {"Ref":"AlbListener"},
+                "Priority" : 1
+            }
+        },
+            
+        "AlbListener": {
+            "Type" : "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties" : {
+                "DefaultActions" :  [{
+                    "Type": "forward",
+                    "TargetGroupArn": { "Ref": "AlbTargetGroup" }
+                  }],
+                "LoadBalancerArn" : {"Ref":"AsgLoadBalancer"},
+                "Port" : 80,
+                "Protocol" : "HTTP"
+            }
+        },
+        "AlbR53Record":{
+            "Type" : "AWS::Route53::RecordSetGroup",
+            "Properties" : {
+              "HostedZoneName" : {"Ref":"HostedZoneNameAlb"},
+              "Comment" : "Zone apex alias targeted to AsgLoadBalancer.",
+              "RecordSets" : [
+                {
+                  "Name" : {"Ref":"HostedName"},
+                  "Type" : "A",
+                  "AliasTarget" : {
+                      "HostedZoneId" : { "Fn::GetAtt" : ["AsgLoadBalancer", "CanonicalHostedZoneID"] },
+                      "DNSName" : { "Fn::GetAtt" : ["AsgLoadBalancer","DNSName"] }
+                  }
+                }
+              ]
+            }
+        }
+        
+          
+
+
+
+
+}
+}
